@@ -1048,10 +1048,10 @@ export function tele_fill(book: Book, tel: HTerm, xs: HTerm[], ctx: Ctx, def?: N
   return out;
 }
 
-export function tele_unbind(book: Book, T: HTerm): { doms: Array<[Quant, Name, HTerm]>; ret: HTerm } {
+export function tele_unbind(book: Book, T: HTerm, max = Infinity): { doms: Array<[Quant, Name, HTerm]>; ret: HTerm } {
   const doms: Array<[Quant, Name, HTerm]> = [];
   let tel = T;
-  for (let t = tele_open(book, tel); t !== null; t = tele_open(book, tel)) {
+  for (let t = tele_open(book, tel); t !== null && doms.length < max; t = tele_open(book, tel)) {
     doms.push([t.q, t.k, t.A]);
     tel = t.B(Var(t.k, doms.length - 1));
   }
@@ -3708,7 +3708,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
 }
 
 export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
-  const qs = tele_unbind(book, def.T).doms.map((dom) => dom[0]);
+  const qs = tele_unbind(book, def.T, def.n).doms.map((dom) => dom[0]);
   const gen = def.x === 0 ? book : { ...book, tlds: Object.create(book.tlds) };
   let [t, v, T]: HTerm[] = [Ref(k), def.v as HTerm, def.T];
   for (let j = 0; j < def.x; j++) {
@@ -3806,7 +3806,7 @@ export function book_valid(book: Book, done: number = 0): void {
     if (tld.$ === "ADT") {
       if (i >= done) {
         term_check(book, { t: Ref(k), n: 0, def: k, qs: [] }, tld.T, None(), Typ(Qua(Lone())), ctx_nil(), 0);
-        const { doms, ret: kind } = tele_unbind(book, tld.T);
+        const { doms, ret: kind } = tele_unbind(book, tld.T, tld.n);
         if (kind.$ !== "Typ") {
           let ctx = ctx_nil();
           for (const [d, [q, x, A]] of doms.entries()) {

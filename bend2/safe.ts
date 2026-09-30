@@ -374,7 +374,7 @@ function spec_of(e: Safe, k: Name): boolean[] {
       }
     };
     [tld.T, ...(tld.$ === "ADT" ? tld.c.map((c) => c.T) : [])].forEach((T) => go(B.term_lower(T), false));
-    sp = B.tele_unbind(e.book, tld.T).doms.slice(0, tld.n).map(([, , A], j) => got.has(j) || is_qnt(e, A) || (tld.$ === "Def" && j < tld.x));
+    sp = B.tele_unbind(e.book, tld.T, tld.n).doms.map(([, , A], j) => got.has(j) || is_qnt(e, A) || (tld.$ === "Def" && j < tld.x));
     e.spec.set(k, sp);
   }
   return sp;
@@ -999,7 +999,7 @@ function group_new(e: Safe, k: Name): Group | null {
     }
     return j;
   }));
-  const doms = B.tele_unbind(e.book, e.book.tlds[k].T).doms.slice(0, lead);
+  const doms = B.tele_unbind(e.book, e.book.tlds[k].T, lead).doms;
   if (hs.length === 0 || !doms.some(([q], j) => q.$ !== "None" && spec_of(e, k)[j] !== true)) {
     return null;
   }
@@ -1045,7 +1045,7 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
   const rest = (s1: Scope, m: Name) => {
     const sp = spec_of(e, m);
     const r = tele_open(e, s1, e.book.tlds[m].T, lead, sp.length);
-    const qs = B.tele_unbind(e.book, e.book.tlds[m].T).doms.map(([q]) => quant(q));
+    const qs = B.tele_unbind(e.book, e.book.tlds[m].T, sp.length).doms.map(([q]) => quant(q));
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => sp[j] ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => sp[j] ? x : null) };
   };
   // the selector's match: a member's arm past its tag (and a helper's (.k, ()))
@@ -1080,7 +1080,7 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
 // for its ~ argument, a column the tree drops
 function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
   const tld = e.book.tlds[k] as Def;
-  const ps = new Map(B.tele_unbind(e.book, tld.T).doms.slice(0, tld.x).map(([, p], j) => [k + "~" + p, cols[j]]));
+  const ps = new Map(B.tele_unbind(e.book, tld.T, tld.x).doms.map(([, p], j) => [k + "~" + p, cols[j]]));
   const t0 = B.term_higher(tld.e as B.LTerm);
   let t = tld.x === 0 ? t0 : subst(t0, 0, (o) => o.$ === "Ref" ? ps.get(o.k as Name) ?? undefined : undefined);
   let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
