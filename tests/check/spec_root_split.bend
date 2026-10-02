@@ -1,6 +1,7 @@
 # a root stuck on a specialized parameter splits at its constructors
 # (run3, #1175; run4; dup), rebuilt each time (two_split, tag_id,
-# res_root, res_pt, nest). The laws check the emitted book's values
+# res_root, res_pt, nest); a Quant one only when read (q_unread goes out
+# once). The laws check the emitted book's values
 import Base
 
 type Box is Type:
@@ -104,6 +105,9 @@ def nest_q(c: Two<Two<Mode, Mode>, Mode>) -> Quant:
     case Two{Two{Owned{}, y}, z}: &1
 
 def nest(c: Two<Two<Mode, Mode>, Mode>, -A: Kind(nest_q(c)), x: Nat) -> Nat:
+  x
+
+def q_unread(a: Quant, x: Nat) -> Nat:
   x
 
 def main() -> Nat:

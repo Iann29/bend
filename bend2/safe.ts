@@ -112,7 +112,7 @@ type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
 // kernel names taken, why each failed item is out of
 // scope, each item's specialized parameters, each def's group, each
 // template instance's template and ~ arguments (its key in book.tmps),
-// and each root constant's split
+// each root constant's split, and whether each field reaches its datatype
 type Safe = {
   book: Book;
   mb: Book;
@@ -126,6 +126,7 @@ type Safe = {
   groups: Map<Name, Group | null>;
   inst: Map<Name, [Name, HTerm[]]>;
   splits: Map<Name, [string, number]>;
+  rec: Map<string, boolean>;
 };
 
 // Constants
@@ -158,7 +159,7 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
     todo: [], taken: new Set(), fail: new Map(), spec: new Map(), groups: new Map(),
     inst: new Map(Object.entries(book.tmps).flatMap(([k, is]) => Object.entries(is).map(([key, n]): [Name, [Name, HTerm[]]] =>
-      [n, [k, key.split("\n").map((a) => B.term_higher(JSON.parse(a) as B.LTerm))]]))), splits: new Map() };
+      [n, [k, key.split("\n").map((a) => B.term_higher(JSON.parse(a) as B.LTerm))]]))), splits: new Map(), rec: new Map() };
   const roots: Array<[Name, string]> = [];
   for (const k of [...book.order].filter((k, i) => book.order.lastIndexOf(k) === i && book.tlds[k].b !== true)) {
     try {
@@ -171,8 +172,6 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
       e.fail.set(n, x.message);
       roots.push([k, n]);
     }
-    e.splits.clear();
-    drain(e);
   }
   // a def that names a def out of scope is out too
   const bad = new Map(e.fail);
@@ -190,13 +189,13 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
   const by = new Map(e.out.map(([k, T, v]) => [k, [...o_refs(T), ...o_refs(v)]]));
   const keep = new Set<string>();
   const go = (n: string): void => {
-    if (by.has(n) && !bad.has(n) && !keep.has(n)) {
+    if (by.has(n) && !keep.has(n)) {
       keep.add(n);
       by.get(n)?.forEach(go);
     }
   };
   roots.forEach(([, n]) => go(n));
-  e.out = e.out.filter(([k]) => keep.has(k));
+  e.out = e.out.filter(([k]) => keep.has(k) && !bad.has(k));
   const oos = roots.filter(([, n]) => bad.has(n)).map(([k, n]): [Name, string] => [k, bad.get(n) as string]);
   return { text: book_show(e), oos };
 }
@@ -211,6 +210,8 @@ function root_at(e: Safe, k: Name, ds: Map<string, number>): Array<[Name, string
   } catch (x) {
     const sp = x instanceof Scope_Error ? split(e, x.stuck) : undefined;
     if (sp === undefined) {
+      e.splits.clear();
+      drain(e);
       throw x;
     }
     return [...Array(sp[1]).keys()].flatMap((i) => root_at(e, k, new Map([...ds, [sp[0], i]])));
@@ -237,51 +238,68 @@ function root_cols(e: Safe, k: Name, ds: Map<string, number>): Cols {
 }
 
 // the value at path p: ds's choice there, else a constant that splits if
-// may (a Quant one at once)
+// may and it has values
 function value(e: Safe, n: string, T: HTerm, p: string, ds: Map<string, number>, may: boolean): HTerm {
   const i = ds.get(p);
   const A = B.term_wnf(e.book, T);
   if (i === undefined) {
     let c = n;
-    while (e.book.tlds[c] !== undefined) {
-      c += "~";
+    for (let j = 1; e.book.tlds[c] !== undefined; j++) {
+      c = n + "~" + j;
     }
     const def: Def = { $: "Def", n: 0, x: 0, T, v: null };
     e.book.tlds[c] = def;
     e.mb.tlds[c] = { ...def, v: model(e, T) };
-    if (A.$ === "Qnt" || A.$ === "ADT" && may) {
-      e.splits.set(c, [p, A.$ === "Qnt" ? 3 : B.book_adt(e.book, A, B.ctx_nil()).c.length]);
+    const k = A.$ === "Qnt" ? 3 : A.$ === "ADT" && may ? B.book_adt(e.book, A, B.ctx_nil()).c.length : 0;
+    if (k > 0) {
+      e.splits.set(c, [p, k]);
     }
-    return A.$ === "Qnt" ? oos("a Quant parameter", B.Ref(c)) : B.Ref(c);
+    return B.Ref(c);
   }
   if (A.$ !== "ADT") {
     return B.Qua([B.None(), B.Lone(), B.Many()][i]);
   }
   const d = B.book_adt(e.book, A, B.ctx_nil()).c[i];
-  const fs = B.tele_unbind(e.book, d.T).doms.slice(A.x.length);
   const xs: HTerm[] = [];
   for (let U = B.term_wnf(e.book, B.tele_fill(e.book, d.T, A.x, B.ctx_nil())); U.$ === "All"; U = B.term_wnf(e.book, U.B(xs[xs.length - 1]))) {
-    xs.push(value(e, n + "." + U.k, U.A, p + "." + xs.length, ds, !reaches(e, fs[xs.length][2], A.k)));
+    xs.push(value(e, n + "." + U.k, U.A, p + "." + xs.length, ds, !recurs(e, A, d, A.x.length + xs.length)));
   }
   return B.term_snf(e.book, B.Ctr(d.k, xs));
 }
 
-// whether T reaches datatype k through the names in it
-function reaches(e: Safe, T: HTerm, k: Name, seen = new Set<Name>()): boolean {
-  return names(B.term_lower(T)).some((n) => {
+// whether binder j of constructor d's telescope, at A's arguments, reaches A
+function recurs(e: Safe, A: Extract<HTerm, { $: "ADT" }>, d: B.Ctr, j: number): boolean {
+  const key = [B.term_key(B.term_lower(A)), d.k, j].join("\n");
+  if (!e.rec.has(key)) {
+    e.rec.set(key, reaches(e, B.term_lower(B.tele_unbind(e.book, d.T).doms[j][2], j), A.k, A.x));
+  }
+  return e.rec.get(key) as boolean;
+}
+
+// whether the lowered t reaches datatype k through its names
+function reaches(e: Safe, t: unknown, k: Name, ps: HTerm[] = [], seen = new Set<Name>()): boolean {
+  return names(t, ps).some((n) => {
     const d = e.book.tlds[n];
     const us = d?.$ === "ADT" ? d.c.map((c) => c.T) : d?.$ === "Def" && d.v !== null ? [d.v] : [];
-    return n === k || !seen.has(n) && seen.add(n) && us.some((u) => reaches(e, u, k, seen));
+    return n === k || !seen.has(n) && seen.add(n) && us.some((u) => reaches(e, B.term_lower(u), k, [], seen));
   });
 }
 
-// the names in a lowered term
-function names(t: unknown): Name[] {
+// the names in a lowered term, and in ps[i] where it applies parameter i
+// or hands it to a def (not where it holds it as data)
+function names(t: unknown, ps: HTerm[] = [], data = true): Name[] {
   if (typeof t !== "object" || t === null) {
     return [];
   }
+  if (Array.isArray(t)) {
+    return t.flatMap((x) => names(x, ps, data));
+  }
   const o = t as Record<string, unknown>;
-  return [...o.$ === "Ref" || o.$ === "ADT" ? [o.k as Name] : [], ...Object.entries(o).flatMap(([f, v]) => f === "s" ? [] : names(v))];
+  const i = o.i as number;
+  if (o.$ === "Var") {
+    return !data && i >= 0 && i < ps.length ? names(B.term_lower(ps[i])) : [];
+  }
+  return [...o.$ === "Ref" || o.$ === "ADT" ? [o.k as Name] : [], ...Object.entries(o).flatMap(([f, v]) => f === "s" ? [] : names(v, ps, o.$ === "ADT"))];
 }
 
 // the first constant in t that splits: its path and value count
@@ -362,7 +380,7 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
 // its type
 function def_emit(e: Safe, k: Name, cols: Cols, n: string, tld: Def): void {
   const T = type_drop(e, tld.T, cols);
-  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
+  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k), B.Ref(k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
   e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
@@ -546,8 +564,8 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
 // a def name, taken here
 function fresh(e: Safe, n: string): string {
   let k = n;
-  while (e.taken.has(k)) {
-    k += "_";
+  for (let i = 1; e.taken.has(k); i++) {
+    k = n + "_" + i;
   }
   e.taken.add(k);
   return k;
@@ -815,7 +833,7 @@ function pick(e: Safe, t: HTerm, v: HTerm): [HTerm, HTerm[]] {
     [m] = open(m.m);
   }
   if (c.$ !== "Ctr" || m.$ === "Efq") {
-    return oos("a specialized argument that is not a constructor", w);
+    return oos("a specialized argument that is not a constructor", c.$ === "Ctr" ? undefined : w);
   }
   return m.$ === "Mat" ? [m.h, c.x] : [m, [c]];
 }
@@ -880,12 +898,8 @@ function kind(e: Safe, s: Scope, T: HTerm): Q | null {
   if (tld === undefined) {
     return null;
   }
-  try {
-    const K = B.term_wnf(e.book, B.tele_fill(e.book, tld.T, xs, B.ctx_nil()));
-    return K.$ === "Typ" ? Math.max(1, quant_eval(e, s, K.g)) as Q : null;
-  } catch {
-    return null;
-  }
+  const K = B.term_wnf(e.book, B.tele_fill(e.book, tld.T, xs, B.ctx_nil()));
+  return K.$ === "Typ" ? Math.max(1, quant_eval(e, s, K.g)) as Q : null;
 }
 
 // Term
