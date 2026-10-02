@@ -5,6 +5,12 @@
 # so run3 was out of scope (#1175); a match in the body splits it too
 # (run4, whose kind ignores f). A branch may rely on its kind (dup
 # copies x only where A is Data), so each root keeps the value it read.
+# Each split goes back and builds its roots again, fresh: sibling roots
+# share no constant (two_split's g fails at m in one, then splits it in
+# the other), a field takes its type from the fields before it (tag_id's
+# val, at Sel of the mode it split), and a dead item stuck on a constant
+# splits it too (res_root's Res<m>, named only in a type). A datatype
+# nested in itself at other arguments splits (nest_q's Two in Two).
 # The laws check the values in the emitted book
 import Base
 
@@ -52,6 +58,58 @@ def dup(c: Cfg, -A: Kind(elem_q(c)), x: A, d: A) -> (A & A):
 def pick(p: Nat & Nat) -> Nat:
   match p:
     case (a, b): Nat.add(a, b)
+
+def qb(b: Bool, m: Mode) -> Quant:
+  match b:
+    case False{}: &1
+    case True{}: &1
+
+def g(m: Mode, -A: Kind(elem_m(m)), x: Nat) -> Nat:
+  x
+
+def elem_m(m: Mode) -> Quant:
+  match m:
+    case Shared{}: &2
+    case Owned{}: &1
+
+def two_split(b: Bool, m: Mode, -A: Kind(qb(b, m)), x: Nat) -> Nat:
+  g(m, Nat, x)
+
+def Sel(m: Mode) -> Data:
+  match m:
+    case Shared{}: Nat
+    case Owned{}: Mode
+
+type Tag is Data:
+  Tag{mode: Mode, val: Sel(mode)}
+
+def tag_q(c: Tag) -> Quant:
+  match c:
+    case Tag{Shared{}, v}: &2
+    case Tag{Owned{}, v}: &1
+
+def tag_id(c: Tag, -A: Kind(tag_q(c)), x: Nat) -> Tag:
+  c
+
+type Res<m: Mode> is Kind(elem_m(m)):
+  Res{n: Nat}
+
+def res_root(m: Mode, -A: Kind(q0b(m)), r: Res<m>) -> Nat:
+  0n
+
+def q0b(m: Mode) -> Quant:
+  &1
+
+type Two<-A: Data, -B: Data> is Data:
+  Two{a: A, b: B}
+
+def nest_q(c: Two<Two<Mode, Mode>, Mode>) -> Quant:
+  match c:
+    case Two{Two{Shared{}, y}, z}: &2
+    case Two{Two{Owned{}, y}, z}: &1
+
+def nest(c: Two<Two<Mode, Mode>, Mode>, -A: Kind(nest_q(c)), x: Nat) -> Nat:
+  x
 
 def main() -> Nat:
   Nat.add(Nat.add(run3(Mk{(y: Nat) => 1n}, Nat, 0n), run4(Mk{(y: Nat) => 2n}, Nat, 0n)),
