@@ -7,8 +7,9 @@
 # copies x only where A is Data), so each root keeps the value it read.
 # A split builds the root again: sibling roots share no constant
 # (two_split), a field's type follows the fields before it (tag_id), an
-# item named only in a type splits too (res_root), and a datatype nested
-# in itself at other arguments splits (nest).
+# item named only in a type splits too (res_root), what a failed attempt
+# named still goes out (res_pt's Pt), and a datatype nested in itself at
+# other arguments splits (nest).
 # The laws check the values in the emitted book
 import Base
 
@@ -97,6 +98,12 @@ def res_root(m: Mode, -A: Kind(q0b(m)), r: Res<m>) -> Nat:
 
 def q0b(m: Mode) -> Quant:
   &1
+
+def Pt(f: Box, -A: Kind(q1(f))) -> Type:
+  Nat
+
+def res_pt(m: Mode, -A: Kind(q0b(m)), w: Pt(Mk{(y: Nat) => 1n}, Nat), r: Res<m>) -> Nat:
+  0n
 
 type Two<-A: Data, -B: Data> is Data:
   Two{a: A, b: B}
