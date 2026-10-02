@@ -1,16 +1,6 @@
-# a parameter a kind reads is specialized, and its root goes out at one
-# opaque constant; when a kind is stuck on a match of it, the root splits
-# it at each constructor, its fields fresh constants, and again inside
-# them, until the kind is a literal. At the one constant, q1(f) was stuck,
-# so run3 was out of scope (#1175); a match in the body splits it too
-# (run4, whose kind ignores f). A branch may rely on its kind (dup
-# copies x only where A is Data), so each root keeps the value it read.
-# A split builds the root again: sibling roots share no constant
-# (two_split), a field's type follows the fields before it (tag_id), an
-# item named only in a type splits too (res_root), what a failed attempt
-# named still goes out (res_pt's Pt), and a datatype nested in itself at
-# other arguments splits (nest).
-# The laws check the values in the emitted book
+# a root stuck on a specialized parameter splits at its constructors
+# (run3, #1175; run4; dup), rebuilt each time (two_split, tag_id,
+# res_root, res_pt, nest). The laws check the emitted book's values
 import Base
 
 type Box is Type:

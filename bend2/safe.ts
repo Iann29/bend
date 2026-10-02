@@ -112,7 +112,7 @@ type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
 // kernel names taken, why each failed item is out of
 // scope, each item's specialized parameters, each def's group, each
 // template instance's template and ~ arguments (its key in book.tmps),
-// and each root constant that splits: its path and how many values
+// and each root constant's split
 type Safe = {
   book: Book;
   mb: Book;
@@ -186,7 +186,7 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
       }
     }
   }
-  // what the roots reach goes out (not a failed attempt's items)
+  // only what the roots reach goes out
   const by = new Map(e.out.map(([k, T, v]) => [k, [...o_refs(T), ...o_refs(v)]]));
   const keep = new Set<string>();
   const go = (n: string): void => {
@@ -201,9 +201,7 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
   return { text: book_show(e), oos };
 }
 
-// root k at the decisions ds (a value per path into its specialized
-// arguments), and its names: stuck on a constant anywhere it reaches, it
-// goes again at each value of that constant
+// root k at the decisions ds, split where stuck on a constant
 function root_at(e: Safe, k: Name, ds: Map<string, number>): Array<[Name, string]> {
   e.splits.clear();
   try {
@@ -219,7 +217,7 @@ function root_at(e: Safe, k: Name, ds: Map<string, number>): Array<[Name, string
   }
 }
 
-// root k's columns at ds: a specialized parameter at its value
+// root k's columns at ds
 function root_cols(e: Safe, k: Name, ds: Map<string, number>): Cols {
   const sp = spec_of(e, k);
   const cols: Cols = [];
@@ -238,11 +236,8 @@ function root_cols(e: Safe, k: Name, ds: Map<string, number>): Cols {
   return cols;
 }
 
-// the value of type T at path p: ds's literal or constructor there (its
-// fields values too), else an opaque constant n, read at its model by
-// models (bend2 checks a template at every argument), which splits when
-// it may (a field whose declared type reaches its datatype does not: a
-// kind recursing through it is out of scope); a Quant one splits at once
+// the value at path p: ds's choice there, else a constant that splits if
+// may (a Quant one at once)
 function value(e: Safe, n: string, T: HTerm, p: string, ds: Map<string, number>, may: boolean): HTerm {
   const i = ds.get(p);
   const A = B.term_wnf(e.book, T);
@@ -271,7 +266,7 @@ function value(e: Safe, n: string, T: HTerm, p: string, ds: Map<string, number>,
   return B.term_snf(e.book, B.Ctr(d.k, xs));
 }
 
-// whether T names datatype k, or a def or datatype that does
+// whether T reaches datatype k through the names in it
 function reaches(e: Safe, T: HTerm, k: Name, seen = new Set<Name>()): boolean {
   return names(B.term_lower(T)).some((n) => {
     const d = e.book.tlds[n];
@@ -280,7 +275,7 @@ function reaches(e: Safe, T: HTerm, k: Name, seen = new Set<Name>()): boolean {
   });
 }
 
-// the defs and datatypes a lowered term names
+// the names in a lowered term
 function names(t: unknown): Name[] {
   if (typeof t !== "object" || t === null) {
     return [];
@@ -289,12 +284,12 @@ function names(t: unknown): Name[] {
   return [...o.$ === "Ref" || o.$ === "ADT" ? [o.k as Name] : [], ...Object.entries(o).flatMap(([f, v]) => f === "s" ? [] : names(v))];
 }
 
-// the first constant in t that splits: its path and how many values
+// the first constant in t that splits: its path and value count
 function split(e: Safe, t?: HTerm): [string, number] | undefined {
   return t && names(B.term_lower(t)).map((n) => e.splits.get(n)).find((x) => x !== undefined);
 }
 
-// the items named but not yet out; a failure a split may help goes up
+// the pending items; a failure a split may help goes up
 function drain(e: Safe): void {
   for (let it = e.todo.pop(); it !== undefined; it = e.todo.pop()) {
     try {
