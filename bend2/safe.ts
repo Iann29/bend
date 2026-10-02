@@ -112,7 +112,7 @@ type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
 // kernel names taken, why each failed item is out of
 // scope, each item's specialized parameters, each def's group, each
 // template instance's template and ~ arguments (its key in book.tmps),
-// and each root constant's path and the datatypes it is inside
+// and each root constant's path and the datatypes around it
 type Safe = {
   book: Book;
   mb: Book;
@@ -134,8 +134,7 @@ type Safe = {
 // a Nat literal longer than this goes out as arithmetic on shorter ones
 const NAT_MAX = 4096;
 
-// a root constant this many fields deep is not split (a kind that reads a
-// value through a datatype nested at ever larger arguments)
+// a root constant this many fields deep does not split
 const SPLIT_MAX = 16;
 
 // Errors
@@ -194,10 +193,9 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
   return { text: book_show(e), oos };
 }
 
-// root k at the decisions ds (the value each path into its specialized
-// arguments takes, while a split is one), and its name. Stuck on one of
-// its constants, anywhere in what it names, live or dead, the root goes
-// again, at fresh constants, at each value of that constant (split)
+// root k at the decisions ds (a value per path into its specialized
+// arguments), and its names: stuck on a constant anywhere it reaches, it
+// goes again at each value of that constant
 function root_at(e: Safe, k: Name, ds: Map<string, number>): Array<[Name, string]> {
   try {
     const n = item_ref(e, k, root_cols(e, k, ds), true);
@@ -213,8 +211,7 @@ function root_at(e: Safe, k: Name, ds: Map<string, number>): Array<[Name, string
   }
 }
 
-// the columns root k checks at: a specialized parameter at its value, any
-// other null
+// root k's columns at ds: a specialized parameter at its value
 function root_cols(e: Safe, k: Name, ds: Map<string, number>): Cols {
   const sp = spec_of(e, k);
   const cols: Cols = [];
@@ -233,12 +230,10 @@ function root_cols(e: Safe, k: Name, ds: Map<string, number>): Cols {
   return cols;
 }
 
-// the value at path p of a root's specialized argument, of type T: the one
-// ds takes there (a Quant literal, or a constructor whose fields are values
-// too, each at its type past the fields before it), else an opaque
-// constant n, which models read at its model (as bend2 checks a template:
-// its body holds at every argument), and a Quant one splits at once; up
-// lists the datatypes p is inside
+// the value of type T at path p: ds's literal or constructor there (its
+// fields values too), else an opaque constant n, read at its model by
+// models (bend2 checks a template at every argument); a Quant one splits
+// at once
 function value(e: Safe, n: string, T: HTerm, p: string, ds: Map<string, number>, up: string[]): HTerm {
   const i = ds.get(p);
   const A = B.term_wnf(e.book, T);
@@ -270,11 +265,9 @@ function ctrs(e: Safe, A: Extract<HTerm, { $: "ADT" }>): B.Ctr[] {
   return (e.book.tlds[A.k] as ADT).c.filter((d) => !A.r.includes(d.k));
 }
 
-// the split a term t stuck on root constants needs: the first one that
-// splits, its path and how many values it goes at (each Quant literal, or
-// each constructor left); none splits when it is inside its own datatype
-// (a kind that reads a value through a recursive type is out of scope),
-// SPLIT_MAX deep, or of no such type
+// the first root constant in t that splits: its path and how many values
+// it takes; none inside its own datatype (a kind recursing through it is
+// out of scope) or SPLIT_MAX deep
 function split(e: Safe, t?: HTerm): { p: string; n: number } | null {
   if (t === undefined) {
     return null;
@@ -294,8 +287,8 @@ function split(e: Safe, t?: HTerm): { p: string; n: number } | null {
   return null;
 }
 
-// the items named but not yet out; one that fails stays out of scope,
-// unless a split could help it and up holds: then the root's attempt fails
+// the items named but not yet out; a failure a split may help goes up
+// when up holds
 function drain(e: Safe, up: boolean): void {
   for (let it = e.todo.pop(); it !== undefined; it = e.todo.pop()) {
     try {

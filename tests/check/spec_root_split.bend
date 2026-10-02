@@ -5,12 +5,10 @@
 # so run3 was out of scope (#1175); a match in the body splits it too
 # (run4, whose kind ignores f). A branch may rely on its kind (dup
 # copies x only where A is Data), so each root keeps the value it read.
-# Each split goes back and builds its roots again, fresh: sibling roots
-# share no constant (two_split's g fails at m in one, then splits it in
-# the other), a field takes its type from the fields before it (tag_id's
-# val, at Sel of the mode it split), and a dead item stuck on a constant
-# splits it too (res_root's Res<m>, named only in a type). A datatype
-# nested in itself at other arguments splits (nest_q's Two in Two).
+# A split builds the root again: sibling roots share no constant
+# (two_split), a field's type follows the fields before it (tag_id), an
+# item named only in a type splits too (res_root), and a datatype nested
+# in itself at other arguments splits (nest).
 # The laws check the values in the emitted book
 import Base
 
