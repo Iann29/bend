@@ -158,6 +158,11 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
 
 const WIDE = 247;
 
+// BEND_FLAT_MAX=n boxes a datatype wider than n words, as one wider than
+// WIDE is (a word's bit chain excepted). Every segment takes the widest
+// segment's words, so a few wide records make every signature that wide.
+const FLAT_MAX = Number(process.env.BEND_FLAT_MAX ?? WIDE);
+
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
   + " --gpu 8GB|a function the device does not hold|a Nat past the"
   + " largest immediate 2^48-1|*|memory fault (machine stack overflow?)|an"
@@ -940,7 +945,8 @@ function lay_of(A: HTerm | null): Lay {
     FL.lays.set(key, BOX);
     const lay = lay_pack(tld.c.map((c) =>
       [c.k, ctr_doms(c, t.x).map((A) => lay_of(A))]));
-    return lay.ks.length > WIDE ? BOX : lay;
+    return lay.ks.length > WIDE || lay.ks.length > FLAT_MAX
+      && t.k !== "Word.Con" ? BOX : lay;
   });
 }
 
