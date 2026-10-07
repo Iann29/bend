@@ -2899,8 +2899,11 @@ export function compile_book(book: Bend.Book): string {
     return (dev.has(seg.fid) ? out : ["#if !DEVICE", ...out, "#endif"])
       .join("\n");
   }).join("\n\n");
-  return c_ids(runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
+  const c = c_ids(runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
     effect_srcs(".c", "no .c import: ").join("")));
+  // keep nothing memoized: clang may run next, while this process waits
+  FL = file_new(book, false);
+  return c;
 }
 
 // JS
