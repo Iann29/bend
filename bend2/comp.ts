@@ -178,10 +178,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  u32_div: {
-    C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
-    JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
-  },
+  u32_div: { C: "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
+    JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)" },
   u32_mod: {
     C:  "((u32)($1) == 0 ? $0 : U32_BIN($0, -,"
       + " U32_QUO((u32)($0), (u32)($1)) * $1))",
@@ -194,10 +192,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "($1 >= 32 ? 0 : ($0 $o $1) >>> 0)"),
   u32_not: { C: "((u64)~(u32)($0))", JS: "(~$0 >>> 0)" },
   u32_is_zero: { C: "U32_BIN($0, ==, 0)", JS: "($0 === 0)" },
-  u32_cmp: {
-    C:  "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
-    JS: "cmp_new($0, $1)",
-  },
+  u32_cmp: { C: "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
+    JS: "cmp_new($0, $1)" },
   u32_to_f32: { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0)" },
   u32_to_nat: { C: "((u64)$0)", JS: "$0" },
   u32_from_nat: { C: "((u64)(u32)($0))", JS: "($0 >>> 0)" },
@@ -218,14 +214,10 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     JS: "($0 === 1 || $0 === -1 && Math.abs($1) === Infinity ? 1"
       + " : Math.fround(Math.pow($0, $1)))",
   },
-  f32_mod: {
-    C:  "f32_rewrap((f32)fmod(f32_unbox($0), f32_unbox($1)))",
-    JS: "Math.fround($0 % $1)",
-  },
-  f32_to_u32: {
-    C:  "f32_to_u32($0)",
-    JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)",
-  },
+  f32_mod: { C: "f32_rewrap((f32)fmod(f32_unbox($0), f32_unbox($1)))",
+    JS: "Math.fround($0 % $1)" },
+  f32_to_u32: { C: "f32_to_u32($0)",
+    JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)" },
   f32_bits: { C: "$0", JS: "f32_bits($0)" },
   ...tpl_ops("f32_", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
   nat_add: { C: "nat_chk(e, $0 + $1)", JS: "nat_chk($0 + $1)" },
@@ -235,10 +227,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   ...tpl_ops("nat_", "sub", "($0 < $1 ? 0 : $0 - $1)"),
   ...tpl_ops("nat_", "is_lt:<", "($0 $o $1)"),
   ...tpl_ops("nat_", "min:< max:>", "($0 $o $1 ? $0 : $1)"),
-  nat_divmod: {
-    C:  ["($1 == 0 ? 0 : $0 / $1)", "($1 == 0 ? $0 : $0 % $1)"],
-    JS: "nat_divmod($0, $1)",
-  },
+  nat_divmod: { C: ["($1 == 0 ? 0 : $0 / $1)", "($1 == 0 ? $0 : $0 % $1)"],
+    JS: "nat_divmod($0, $1)" },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
   string_length: { JS: "[...$0].length" },
@@ -248,10 +238,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     swap: "array_rmw($0, $1, () => $2)",
     size: "{$: \"Tuple\", fst: $0, snd: $0.length}",
   }).map(([k, JS]) => ["array_" + k, { C: null, JS }])),
-  array_clone: {
-    C:  ["$0", "blk_copy(e, $0)"],
-    JS: "{$: \"Tuple\", fst: $0, snd: $0.slice()}",
-  },
+  array_clone: { C: ["$0", "blk_copy(e, $0)"],
+    JS: "{$: \"Tuple\", fst: $0, snd: $0.slice()}" },
   ...Object.fromEntries(Object.entries({
     add: "(o + $2) >>> 0", min: "Math.min(o, $2)", max: "Math.max(o, $2)",
     and: "(o & $2) >>> 0", or: "(o | $2) >>> 0", xor: "(o ^ $2) >>> 0",
@@ -992,7 +980,7 @@ function lay_packed(lay: Lay): boolean {
 }
 
 function lay_box(lay: Lay): boolean {
-  return lay.arms === null && lay.ks[0] === "box";
+  return !lay.arms && lay.ks[0] === "box";
 }
 
 function lay_arr(lay: Lay) {
@@ -1716,7 +1704,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
 }
 
 function val_box(sc: Scope, v: Val): string {
-  if (v.lay.arms === null) {
+  if (!v.lay.arms) {
     return val_own(sc, v)[0];
   }
   const arms = Object.keys(v.lay.arms);
@@ -1733,7 +1721,7 @@ function val_box(sc: Scope, v: Val): string {
 }
 
 function val_unbox(sc: Scope, v: Val, lay: Lay): Val {
-  if (lay.arms === null) {
+  if (!lay.arms) {
     return val_new(v.ws, lay);
   }
   const t = emit_alias(sc, v.ws[0], "u");
@@ -3182,17 +3170,6 @@ function js_marshal(A: HTerm | null, out: boolean): string {
   });
 }
 
-function js_host(k: Name): string {
-  const { n, live } = fun_of(k);
-  const ps = live.map((_, i) => "a" + i);
-  const xs = live.map(([, , A], i) => `${js_marshal(A, false)}(${ps[i]})`);
-  const ret = Bend.tele_fill(FL.book, FL.book.tlds[k].T, Array(n).fill(DUMMY),
-    Bend.ctx_nil());
-  const back = live.map(([, , A], i) => `${js_marshal(A, true)}(${ps[i]});`);
-  return `(${ps.join(", ")}) => { const r = ${js_marshal(ret, true)
-    }(run_loop(${js_sat(k)}(${xs.join(", ")}))); ${back.join(" ")} return r; }`;
-}
-
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
 // def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
@@ -3210,9 +3187,17 @@ export function js_lib(book: Bend.Book, mod = false): string {
   }
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
-  const lib = outs === null ? "" : `export default {\n${outs.map((k) =>
-    `  "${Bend.name_key(k)}": run_lib(${js_host(k)}, ${
-      fun_of(k).lays.length}),`).join("\n")}\n};\n`;
+  const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
+    const { n, live, lays } = fun_of(k);
+    const ps = live.map((_, i) => "a" + i);
+    const xs = live.map(([, , A], i) => `${js_marshal(A, false)}(${ps[i]})`);
+    const ret = Bend.tele_fill(FL.book, FL.book.tlds[k].T, Array(n).fill(DUMMY),
+      Bend.ctx_nil());
+    const back = live.map(([, , A], i) => `${js_marshal(A, true)}(${ps[i]});`);
+    return `  "${Bend.name_key(k)}": run_lib((${ps.join(", ")
+      }) => { const r = ${js_marshal(ret, true)}(run_loop(${js_sat(k)}(${
+      xs.join(", ")}))); ${back.join(" ")} return r; }, ${lays.length}),`;
+  }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
     (jmps.set(k, true), [...FL.tails.get(k) ?? []].some(jmp)));
