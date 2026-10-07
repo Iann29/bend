@@ -24,27 +24,14 @@ type Val = { ws: string[]; lay: Lay; stat: boolean };
 type Bind = { val: Val; n: number; A: HTerm };
 
 type Seg = {
-  fid: string;
-  def: Name;
-  ret: Lay;
-  lines: string[];
-  params: string[];
-  ks: Kind[];
-  frame: { pop: number; at: number[] } | null;
-  refs: Set<string>;
-  spin?: boolean;
-  fork?: boolean;
+  fid: string; def: Name; ret: Lay; lines: string[]; params: string[];
+  ks: Kind[]; frame: { pop: number; at: number[] } | null; refs: Set<string>;
+  spin?: boolean; fork?: boolean;
 };
 
 type Spine = {
-  h: HTerm;
-  t: HTerm;
-  all: HTerm[];
-  args: HTerm[];
-  tld: Bend.TLD | undefined;
-  k: Name | null;
-  xs: HTerm[];
-  b?: boolean;
+  h: HTerm; t: HTerm; all: HTerm[]; args: HTerm[]; tld: Bend.TLD | undefined;
+  k: Name | null; xs: HTerm[]; b?: boolean;
 };
 
 type HTerm = Bend.HTerm;
@@ -52,53 +39,28 @@ type HTerm = Bend.HTerm;
 type Name = Bend.Name;
 
 type File = {
-  book: Bend.Book;
-  js: boolean;
-  bangs: Set<Name>;
-  sites: Map<Name, number>;
-  hot: Set<Name>;
-  stat: Set<Name>;
-  own: Set<string>;
-  lend: Set<string>;
-  segs: Seg[];
-  spins: Seg[];
-  spun: Map<string, string>;
-  marsh: Map<string, string>;
-  clos: Set<string>;
-  tabs: Map<string, number>;
-  tails: Map<Name, Set<Name>>;
-  img: string[];
-  lits: Map<string, number>;
-  consts: Map<Lay, Map<HTerm, Val>>;
-  ids: Map<string, string>;
-  taken: Set<string>;
-  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
-  srcs: Map<Name, Set<Name> | null>;
-  loops: Map<Name, Name[]>;
-  flats: Map<Name, boolean>;
-  funs: Map<Name, Fun>;
-  brws: Map<Name, boolean[]>;
-  nodes: Map<Name, Lay>;
-  lays: Map<string, Lay>;
-  lay_ids: Map<Lay, number>;
+  book: Bend.Book; js: boolean; bangs: Set<Name>; sites: Map<Name, number>;
+  hot: Set<Name>; stat: Set<Name>; own: Set<string>; lend: Set<string>;
+  segs: Seg[]; spins: Seg[]; spun: Map<string, string>;
+  marsh: Map<string, string>; clos: Set<string>; tabs: Map<string, number>;
+  tails: Map<Name, Set<Name>>; img: string[]; lits: Map<string, number>;
+  consts: Map<Lay, Map<HTerm, Val>>; ids: Map<string, string>;
+  taken: Set<string>; teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  srcs: Map<Name, Set<Name> | null>; loops: Map<Name, Name[]>;
+  flats: Map<Name, boolean>; funs: Map<Name, Fun>; brws: Map<Name, boolean[]>;
+  nodes: Map<Name, Lay>; lays: Map<string, Lay>; lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
-    uses: Map<HTerm, Bend.PMap<number>>;
-    folds: Map<HTerm, HTerm | null>;
-    spines: Map<HTerm, Spine>;
-    ground: Map<HTerm, boolean>;
+    uses: Map<HTerm, Bend.PMap<number>>; folds: Map<HTerm, HTerm | null>;
+    spines: Map<HTerm, Spine>; ground: Map<HTerm, boolean>;
     steps: Map<HTerm, HTerm>;
   };
 };
 
 type Scope = {
-  seg: Seg;
-  fresh: Map<string, number>;
-  brwl: Map<string, string>;
+  seg: Seg; fresh: Map<string, number>; brwl: Map<string, string>;
   spares: { words: number; name: string; z: boolean }[];
-  uses: Map<Of<"Var">, Bind>;
-  rest: HTerm[];
-  def: Name;
+  uses: Map<Of<"Var">, Bind>; rest: HTerm[]; def: Name;
 };
 
 type Tpl = string | ((xs: string[]) => string);
@@ -748,7 +710,7 @@ function term_any(t: HTerm, p: (s: HTerm, tail: boolean) => boolean,
 
 function term_const(t: HTerm): boolean {
   const s = Bend.term_strip(t);
-  return s.$ === "Lit" ? lit_call(s) === null
+  return s.$ === "Lit" ? !lit_call(s)
     : s.$ === "Ctr" && (s.x.length === 0
       || memo(FL.memo.ground, s, () => s.x.every(term_const)));
 }
@@ -809,7 +771,7 @@ function quant_live(q: Bend.Quant): boolean {
 
 function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
-  const it = tld?.$ === "Def" && tld.i === undefined && tld.b
+  const it = tld?.$ === "Def" && !tld.i && tld.b
     ? OPERATIONS[op_name(k)] : undefined;
   return it && (js || it.C !== undefined) ? it : undefined;
 }
@@ -1161,8 +1123,8 @@ function fun_of(k: Name): Fun {
     }
     const doms = tele_unbind(tld.T).doms;
     const h = tld.e ? Bend.term_higher(tld.e) : null;
-    const n = tld.n + (h === null ? 0
-      : Math.min(def_raise(h, tld.n), doms.length - tld.n));
+    const n = tld.n + (h
+      ? Math.min(def_raise(h, tld.n), doms.length - tld.n) : 0);
     const live = doms.slice(0, n).filter(dom_live);
     const lays = live.map(([, , A]) => lay_of(A));
     if (def_foreign(tld)) {
